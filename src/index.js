@@ -1,3 +1,4 @@
+/* eslint-disable no-shadow */
 const express = require('express');
 const cors = require('cors');
 
@@ -9,20 +10,75 @@ app.use(cors());
 
 const users = [];
 
-function checksExistsUserAccount(request, response, next) {
-  // Complete aqui
-}
+function hasAvailableTodo(user) {
+  if (user.todos.length < 10) {
+    return true;
+  }
 
-function checksCreateTodosUserAvailability(request, response, next) {
-  // Complete aqui
-}
-
-function checksTodoExists(request, response, next) {
-  // Complete aqui
+  return false;
 }
 
 function findUserById(request, response, next) {
-  // Complete aqui
+  const { id } = request.params;
+
+  const user = users.find((user) => user.id === id);
+
+  if (!user) {
+    return response.status(404).json({ error: 'User not found.' });
+  }
+
+  request.user = user;
+  return next();
+}
+
+function checksCreateTodosUserAvailability(request, response, next) {
+  const { user } = request;
+
+  if (user.pro || hasAvailableTodo(user)) {
+    return next();
+  }
+
+  return response.status(403).json({ error: 'You have reached TODO max limit.' });
+}
+
+function checksTodoExists(request, response, next) {
+  const { id } = request.params;
+  const { username } = request.headers;
+
+  const isValidId = validate(id);
+  const user = users.find((user) => user.username === username);
+
+  if (!user) {
+    return response.status(404).json({ error: 'User not found.' });
+  }
+
+  if (!isValidId) {
+    return response.status(400).json({ error: 'Not a valid ID.' });
+  }
+
+  const todo = user.todos.find((todo) => todo.id === id);
+
+  if (!todo) {
+    return response.status(404).json({ error: "TODO doesn't exists." });
+  }
+
+  request.user = user;
+  request.todo = todo;
+
+  return next();
+}
+
+function checksExistsUserAccount(request, response, next) {
+  const { username } = request.headers;
+
+  const user = users.find((user) => user.username === username);
+
+  if (!user) {
+    return response.status(404).json({ error: 'User not found.' });
+  }
+
+  request.user = user;
+  return next();
 }
 
 app.post('/users', (request, response) => {
@@ -39,7 +95,7 @@ app.post('/users', (request, response) => {
     name,
     username,
     pro: false,
-    todos: []
+    todos: [],
   };
 
   users.push(user);
@@ -80,7 +136,7 @@ app.post('/todos', checksExistsUserAccount, checksCreateTodosUserAvailability, (
     title,
     deadline: new Date(deadline),
     done: false,
-    created_at: new Date()
+    created_at: new Date(),
   };
 
   user.todos.push(newTodo);
@@ -126,5 +182,5 @@ module.exports = {
   checksExistsUserAccount,
   checksCreateTodosUserAvailability,
   checksTodoExists,
-  findUserById
+  findUserById,
 };
